@@ -1,0 +1,8 @@
+words = [
+    "buftype",
+    "cursorline",
+    "esc",
+    "fzf",
+    "mkdir",
+    "trimempty",
+]
