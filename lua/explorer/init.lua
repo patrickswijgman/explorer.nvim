@@ -17,7 +17,7 @@ local function split_lines(output)
   return vim.split(output, "\n", { trimempty = true })
 end
 
-local function sort_on_file_path(lines)
+local function sort_lines(lines)
   table.sort(lines, function(_a, _b)
     local a = _a:lower()
     local b = _b:lower()
@@ -37,7 +37,8 @@ end
 local function load_files()
   local fd = cmd({ "fd", "--base-directory", cwd, "--hidden", "--no-ignore", "--exclude", ".git", "--exclude", "node_modules" })
   local fd_lines = split_lines(fd)
-  sort_on_file_path(fd_lines)
+  sort_lines(fd_lines)
+
   local fzf = cmd({ "fzf", "--scheme", "path", "--tiebreak", "pathname", "--filter", query or "" }, fd_lines)
   local fzf_lines = split_lines(fzf)
   files = fzf_lines
@@ -59,9 +60,11 @@ local function restore_cursor()
   if #files == 0 then
     return
   end
+
   local cursor = cursors[cwd] or { 1, 0 }
   local row = clamp(cursor[1], 1, #files)
   local col = cursor[2]
+
   if win and vim.api.nvim_win_is_valid(win) then
     vim.api.nvim_win_set_cursor(win, { row, col })
   end
@@ -115,10 +118,12 @@ end
 
 local function close_win()
   save_cursor()
+
   if win and vim.api.nvim_win_is_valid(win) then
     vim.api.nvim_win_close(win, true)
     win = nil
   end
+
   if prev_win and vim.api.nvim_win_is_valid(prev_win) then
     vim.api.nvim_set_current_win(prev_win)
   end
@@ -139,7 +144,9 @@ local function enter()
   if line == "" then
     return
   end
+
   local path = ("%s/%s"):format(cwd, line)
+
   if vim.endswith(path, "/") then
     table.insert(history, cwd)
     navigate(path)
@@ -177,6 +184,7 @@ local function add()
   if input == "" then
     return
   end
+
   if vim.endswith(input, "/") then
     cmd({ "mkdir", "-p", input })
     load_files()
@@ -194,9 +202,11 @@ local function move()
   if dst == "" or dst == src then
     return
   end
+
   local dir = vim.fn.fnamemodify(dst, ":h")
   cmd({ "mkdir", "-p", dir })
   cmd({ "mv", src, dst })
+
   load_files()
   update_buf()
 end
@@ -208,9 +218,11 @@ local function copy()
   if dst == "" or dst == src then
     return
   end
+
   local dir = vim.fn.fnamemodify(dst, ":h")
   cmd({ "mkdir", "-p", dir })
   cmd({ "cp", "-r", src, dst })
+
   load_files()
   update_buf()
 end
@@ -218,11 +230,15 @@ end
 local function delete()
   local line = vim.api.nvim_get_current_line()
   local path = ("%s/%s"):format(cwd, line)
-  if vim.fn.confirm(("Delete %s ?"):format(path), "&Yes\n&No", 2) == 1 then
-    cmd({ "rm", "-rf", path })
-    load_files()
-    update_buf()
+  local result = vim.fn.confirm(("Delete %s ?"):format(path), "&Yes\n&No", 2)
+  if result ~= 1 then
+    return
   end
+
+  cmd({ "rm", "-rf", path })
+
+  load_files()
+  update_buf()
 end
 
 local function toggle()
