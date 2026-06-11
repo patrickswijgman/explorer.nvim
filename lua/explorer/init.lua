@@ -239,7 +239,7 @@ end
 local function delete()
   local line = vim.api.nvim_get_current_line()
   local path = ("%s/%s"):format(cwd, line)
-  local result = vim.fn.confirm(("Delete %s ?"):format(path), "&Yes\n&No", 2, "Error")
+  local result = vim.fn.confirm(("Delete %s ?"):format(path), "&Yes\n&No", 2)
   if result ~= 1 then
     return
   end
