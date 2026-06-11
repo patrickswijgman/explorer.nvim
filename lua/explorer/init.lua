@@ -186,7 +186,7 @@ local function add()
   if vim.endswith(path, "/") then
     dir = path
   else
-    dir = vim.fn.fnamemodify(path, ":h")
+    dir = ("%s/"):format(vim.fn.fnamemodify(path, ":h"))
   end
 
   local input = vim.fn.input({ prompt = "New: ", default = dir, completion = "file" })
