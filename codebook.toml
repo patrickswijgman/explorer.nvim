@@ -3,6 +3,7 @@ words = [
     "cursorline",
     "esc",
     "fzf",
+    "keymaps",
     "mkdir",
     "trimempty",
 ]

@@ -44,6 +44,11 @@ local function load_files()
   files = fzf_lines
 end
 
+local function create_buf()
+  buf = vim.api.nvim_create_buf(false, true)
+  vim.bo[buf].buftype = "nofile"
+end
+
 local function update_buf()
   vim.bo[buf].modifiable = true
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, files)
@@ -108,6 +113,12 @@ local function get_win_config()
     },
     footer_pos = "center",
   }
+end
+
+local function create_win()
+  win = vim.api.nvim_open_win(buf, true, get_win_config())
+  vim.wo[win].cursorline = true
+  vim.fn.matchadd("Directory", ".*/", -1, -1, { window = win })
 end
 
 local function update_win()
@@ -250,6 +261,20 @@ local function delete()
   update_buf()
 end
 
+local function set_buf_keymaps()
+  local keymap_opts = { buffer = buf, nowait = true }
+  vim.keymap.set("n", "<cr>", enter, keymap_opts)
+  vim.keymap.set("n", "<bs>", back, keymap_opts)
+  vim.keymap.set("n", "a", add, keymap_opts)
+  vim.keymap.set("n", "m", move, keymap_opts)
+  vim.keymap.set("n", "c", copy, keymap_opts)
+  vim.keymap.set("n", "d", delete, keymap_opts)
+  vim.keymap.set("n", "f", filter, keymap_opts)
+  vim.keymap.set("n", "R", refresh, keymap_opts)
+  vim.keymap.set("n", "q", close_win, keymap_opts)
+  vim.keymap.set("n", "<esc>", close_win, keymap_opts)
+end
+
 local function toggle()
   if win and vim.api.nvim_win_is_valid(win) then
     close_win()
@@ -259,29 +284,13 @@ local function toggle()
   if not buf or not vim.api.nvim_buf_is_valid(buf) or not vim.api.nvim_buf_is_loaded(buf) then
     cwd = vim.fn.getcwd()
     load_files()
-
-    buf = vim.api.nvim_create_buf(false, true)
-    vim.bo[buf].buftype = "nofile"
+    create_buf()
+    set_buf_keymaps()
     update_buf()
-
-    local keymap_opts = { buffer = buf, nowait = true }
-    vim.keymap.set("n", "<cr>", enter, keymap_opts)
-    vim.keymap.set("n", "<bs>", back, keymap_opts)
-    vim.keymap.set("n", "a", add, keymap_opts)
-    vim.keymap.set("n", "m", move, keymap_opts)
-    vim.keymap.set("n", "c", copy, keymap_opts)
-    vim.keymap.set("n", "d", delete, keymap_opts)
-    vim.keymap.set("n", "f", filter, keymap_opts)
-    vim.keymap.set("n", "R", refresh, keymap_opts)
-    vim.keymap.set("n", "q", close_win, keymap_opts)
-    vim.keymap.set("n", "<esc>", close_win, keymap_opts)
   end
 
   prev_win = vim.api.nvim_get_current_win()
-
-  win = vim.api.nvim_open_win(buf, true, get_win_config())
-  vim.wo[win].cursorline = true
-  vim.fn.matchadd("Directory", ".*/", -1, -1, { window = win })
+  create_win()
   restore_cursor()
 end
 
