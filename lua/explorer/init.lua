@@ -179,7 +179,16 @@ local function refresh()
 end
 
 local function add()
-  local dir = ("%s/"):format(cwd)
+  local line = vim.api.nvim_get_current_line()
+  local path = ("%s/%s"):format(cwd, line)
+
+  local dir
+  if vim.endswith(path, "/") then
+    dir = path
+  else
+    dir = vim.fn.fnamemodify(path, ":h")
+  end
+
   local input = vim.fn.input({ prompt = "New: ", default = dir, completion = "file" })
   if input == "" then
     return
@@ -230,7 +239,7 @@ end
 local function delete()
   local line = vim.api.nvim_get_current_line()
   local path = ("%s/%s"):format(cwd, line)
-  local result = vim.fn.confirm(("Delete %s ?"):format(path), "&Yes\n&No", 2)
+  local result = vim.fn.confirm(("Delete %s ?"):format(path), "&Yes\n&No", 2, "Error")
   if result ~= 1 then
     return
   end
