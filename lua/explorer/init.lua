@@ -35,6 +35,10 @@ local function clamp(value, min, max)
   return math.min(max, math.max(min, value))
 end
 
+local function get_parent_dir(path)
+  return vim.fn.fnamemodify(path, ":h")
+end
+
 local function load_files()
   local fd = cmd({ "fd", "--base-directory", cwd, "--hidden", "--no-ignore", "--exclude", ".git", "--exclude", "node_modules" })
   local fd_lines = split_lines(fd)
@@ -217,7 +221,7 @@ local function add()
   if vim.endswith(path, "/") then
     dir = path
   else
-    dir = ("%s/"):format(vim.fn.fnamemodify(path, ":h"))
+    dir = ("%s/"):format(get_parent_dir(path))
   end
 
   local input = vim.fn.input({ prompt = "New: ", default = dir, completion = "file" })
@@ -227,12 +231,13 @@ local function add()
 
   if vim.endswith(input, "/") then
     cmd({ "mkdir", "-p", input })
-    load_files()
-    update_buf()
   else
-    close_win()
-    vim.cmd.edit(input)
+    cmd({ "mkdir", "-p", get_parent_dir(input) })
+    cmd({ "touch", input })
   end
+
+  load_files()
+  update_buf()
 end
 
 local function move()
@@ -243,8 +248,7 @@ local function move()
     return
   end
 
-  local dir = vim.fn.fnamemodify(dst, ":h")
-  cmd({ "mkdir", "-p", dir })
+  cmd({ "mkdir", "-p", get_parent_dir(dst) })
   cmd({ "mv", src, dst })
 
   load_files()
@@ -259,8 +263,7 @@ local function copy()
     return
   end
 
-  local dir = vim.fn.fnamemodify(dst, ":h")
-  cmd({ "mkdir", "-p", dir })
+  cmd({ "mkdir", "-p", get_parent_dir(dst) })
   cmd({ "cp", "-r", src, dst })
 
   load_files()
