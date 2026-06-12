@@ -14,6 +14,8 @@ A minimal floating file explorer for Neovim using `fd` and `fzf`.
 :Explorer
 ```
 
+Opens a floating window listing files in the current working directory.
+
 ### Example
 
 ```lua
@@ -25,8 +27,6 @@ vim.keymap.set("n", "<leader>e", ":Explorer<cr>", { desc = "Open explorer" })
 ```
 
 ### Keymaps
-
-Opens a floating window listing files in the current working directory.
 
 | Key         | Action                                       |
 | ----------- | -------------------------------------------- |
