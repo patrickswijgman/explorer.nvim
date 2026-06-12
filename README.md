@@ -6,8 +6,8 @@ A minimal floating file explorer for Neovim using `fd` and `fzf`.
 
 - [fd](https://github.com/sharkdp/fd)
 - [fzf](https://github.com/junegunn/fzf)
+- [nerd font](https://www.nerdfonts.com/) (for the icons)
 - unix commands `mkdir`, `mv`, `cp`, `rm`
-- a nerd font for the icons
 
 ## Usage
 
