@@ -213,6 +213,19 @@ local function refresh()
   update_win()
 end
 
+local function jump_to(path)
+  for i, file in ipairs(files) do
+    local file_path = ("%s/%s"):format(cwd, file)
+
+    if file_path == path then
+      if win and vim.api.nvim_win_is_valid(win) then
+        vim.api.nvim_win_set_cursor(win, { i, 0 })
+      end
+      return
+    end
+  end
+end
+
 local function add()
   local line = vim.api.nvim_get_current_line()
   local path = ("%s/%s"):format(cwd, line)
@@ -236,8 +249,11 @@ local function add()
     cmd({ "touch", input })
   end
 
+  query = nil
   load_files()
   update_buf()
+  update_win()
+  jump_to(input)
 end
 
 local function move()
@@ -253,6 +269,7 @@ local function move()
 
   load_files()
   update_buf()
+  jump_to(dst)
 end
 
 local function copy()
@@ -268,6 +285,7 @@ local function copy()
 
   load_files()
   update_buf()
+  jump_to(dst)
 end
 
 local function delete()
@@ -308,8 +326,8 @@ local function toggle()
     cwd = vim.fn.getcwd()
     load_files()
     create_buf()
-    set_buf_keymaps()
     update_buf()
+    set_buf_keymaps()
   end
 
   prev_win = vim.api.nvim_get_current_win()
