@@ -1,6 +1,7 @@
 local history = {}
 local cursors = {}
 local buf, win, prev_win, files, cwd, query
+local ns = vim.api.nvim_create_namespace("explorer_icons")
 
 local function cmd(command, stdin)
   local result = vim.system(command, { text = true, stdin = stdin }):wait()
@@ -53,6 +54,19 @@ local function update_buf()
   vim.bo[buf].modifiable = true
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, files)
   vim.bo[buf].modifiable = false
+
+  vim.api.nvim_buf_clear_namespace(buf, ns, 0, -1)
+
+  for i, file in ipairs(files) do
+    local is_dir = vim.endswith(file, "/")
+    local icon = is_dir and "󰉋" or "󰈤"
+    local hl = is_dir and "Directory" or "Normal"
+
+    vim.api.nvim_buf_set_extmark(buf, ns, i - 1, 0, {
+      virt_text = { { (" %s "):format(icon), hl } },
+      virt_text_pos = "inline",
+    })
+  end
 end
 
 local function save_cursor()
