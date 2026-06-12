@@ -89,6 +89,12 @@ local function restore_cursor()
   end
 end
 
+local function reset_cursor()
+  if win and vim.api.nvim_win_is_valid(win) then
+    vim.api.nvim_win_set_cursor(win, { 1, 0 })
+  end
+end
+
 local function get_win_config()
   local width = math.floor(vim.o.columns * 0.8)
   local height = math.floor(vim.o.lines * 0.8)
@@ -193,7 +199,7 @@ local function filter()
   load_files()
   update_buf()
   update_win()
-  restore_cursor()
+  reset_cursor()
 end
 
 local function refresh()
