@@ -1,9 +1,12 @@
 words = [
+    "Neovim",
     "buftype",
     "cursorline",
     "esc",
     "fzf",
     "keymaps",
     "mkdir",
+    "netrw",
+    "nvim",
     "trimempty",
 ]
