@@ -20,7 +20,7 @@ Opens a floating window listing files in the current working directory.
 ### Example
 
 ```lua
--- Disable the builtin netrw file explorer:
+-- Recommended: disable the builtin netrw file explorer
 vim.g.loaded_netrw = 1
 vim.g.loaded_netrwPlugin = 1
 

@@ -349,6 +349,15 @@ local function toggle()
   restore_cursor()
 end
 
+local function open_on_enter()
+  local arg = vim.fn.argv(0) --[[@as string]]
+
+  if arg ~= "" and vim.fn.isdirectory(arg) == 1 then
+    vim.cmd.cd(arg)
+    toggle()
+  end
+end
+
 vim.api.nvim_create_user_command("Explorer", toggle, { desc = "Toggle file explorer" })
 
 local group = vim.api.nvim_create_augroup("Explorer", { clear = true })
@@ -356,5 +365,11 @@ local group = vim.api.nvim_create_augroup("Explorer", { clear = true })
 vim.api.nvim_create_autocmd("VimResized", {
   callback = update_win,
   desc = "Resize explorer window on terminal resize",
+  group = group,
+})
+
+vim.api.nvim_create_autocmd("VimEnter", {
+  callback = open_on_enter,
+  desc = "Open explorer when Neovim is opened with a directory",
   group = group,
 })
