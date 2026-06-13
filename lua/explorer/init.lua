@@ -39,6 +39,13 @@ local function get_parent_dir(path)
   return vim.fn.fnamemodify(path, ":h")
 end
 
+local function get_absolute_path(path)
+  if vim.startswith(path, cwd) then
+    return path
+  end
+  return ("%s/%s"):format(cwd, path)
+end
+
 local function load_files()
   local fd = cmd({ "fd", "--base-directory", cwd, "--hidden", "--no-ignore", "--exclude", ".git", "--exclude", "node_modules" })
   local fd_lines = split_lines(fd)
@@ -46,6 +53,7 @@ local function load_files()
 
   local fzf = cmd({ "fzf", "--scheme", "path", "--tiebreak", "pathname", "--filter", query or "" }, fd_lines)
   local fzf_lines = split_lines(fzf)
+
   files = fzf_lines
 end
 
@@ -180,7 +188,7 @@ local function enter()
     return
   end
 
-  local path = ("%s/%s"):format(cwd, line)
+  local path = get_absolute_path(line)
 
   if vim.endswith(path, "/") then
     table.insert(history, cwd)
@@ -215,7 +223,7 @@ end
 
 local function jump_to(path)
   for i, file in ipairs(files) do
-    local file_path = ("%s/%s"):format(cwd, file)
+    local file_path = get_absolute_path(file)
 
     if file_path == path then
       if win and vim.api.nvim_win_is_valid(win) then
@@ -228,7 +236,7 @@ end
 
 local function add()
   local line = vim.api.nvim_get_current_line()
-  local path = ("%s/%s"):format(cwd, line)
+  local path = get_absolute_path(line)
 
   local dir
   if vim.endswith(path, "/") then
@@ -258,7 +266,8 @@ end
 
 local function move()
   local line = vim.api.nvim_get_current_line()
-  local src = ("%s/%s"):format(cwd, line)
+  local src = get_absolute_path(line)
+
   local dst = vim.fn.input({ prompt = "Move to: ", default = src, completion = "file" })
   if dst == "" or dst == src then
     return
@@ -274,7 +283,8 @@ end
 
 local function copy()
   local line = vim.api.nvim_get_current_line()
-  local src = ("%s/%s"):format(cwd, line)
+  local src = get_absolute_path(line)
+
   local dst = vim.fn.input({ prompt = "Copy to: ", default = src, completion = "file" })
   if dst == "" or dst == src then
     return
@@ -290,7 +300,8 @@ end
 
 local function delete()
   local line = vim.api.nvim_get_current_line()
-  local path = ("%s/%s"):format(cwd, line)
+  local path = get_absolute_path(line)
+
   local result = vim.fn.confirm(("Delete %s ?"):format(path), "&Yes\n&No", 2)
   if result ~= 1 then
     return
