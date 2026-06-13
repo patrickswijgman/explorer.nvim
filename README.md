@@ -17,6 +17,8 @@ A minimal floating file explorer for Neovim using `fd` and `fzf`.
 
 Opens a floating window listing files in the current working directory.
 
+Will automatically open when Neovim is invoked with a directory, e.g. `nvim .`
+
 ### Example
 
 ```lua

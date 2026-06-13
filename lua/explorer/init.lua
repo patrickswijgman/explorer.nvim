@@ -232,6 +232,7 @@ local function jump_to(path)
       if win and vim.api.nvim_win_is_valid(win) then
         vim.api.nvim_win_set_cursor(win, { i, 0 })
       end
+
       return
     end
   end
