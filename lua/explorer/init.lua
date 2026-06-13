@@ -43,6 +43,7 @@ local function get_absolute_path(path)
   if vim.startswith(path, cwd) then
     return path
   end
+
   return ("%s/%s"):format(cwd, path)
 end
 
@@ -116,6 +117,7 @@ local function get_win_config()
   local row = math.floor((vim.o.lines - height) / 2)
   local col = math.floor((vim.o.columns - width) / 2)
   local title = (query and query ~= "") and (" %s [%s] "):format(cwd, query) or (" %s "):format(cwd)
+
   return {
     width = width,
     height = height,
