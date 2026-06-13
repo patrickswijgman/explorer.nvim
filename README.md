@@ -35,7 +35,7 @@ vim.keymap.set("n", "<leader>e", ":Explorer<cr>", { desc = "Open explorer" })
 | ----------- | -------------------------------------------- |
 | `<cr>`      | Open file or enter directory (resets filter) |
 | `<bs>`      | Go back                                      |
-| `a`         | Add file or directory                        |
+| `a`         | Add file or directory (resets filter)        |
 | `m`         | Move                                         |
 | `c`         | Copy                                         |
 | `d`         | Delete                                       |
