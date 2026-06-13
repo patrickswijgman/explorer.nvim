@@ -51,10 +51,13 @@ local function load_files()
   local fd_lines = split_lines(fd)
   sort_lines(fd_lines)
 
-  local fzf = cmd({ "fzf", "--scheme", "path", "--tiebreak", "pathname", "--filter", query or "" }, fd_lines)
-  local fzf_lines = split_lines(fzf)
-
-  files = fzf_lines
+  if query and query ~= "" then
+    local fzf = cmd({ "fzf", "--scheme", "path", "--tiebreak", "pathname", "--filter", query }, fd_lines)
+    local fzf_lines = split_lines(fzf)
+    files = fzf_lines
+  else
+    files = fd_lines
+  end
 end
 
 local function create_buf()
