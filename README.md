@@ -31,14 +31,14 @@ vim.keymap.set("n", "<leader>e", ":Explorer<cr>", { desc = "Open explorer" })
 
 ### Keymaps
 
-| Key         | Action                                       |
-| ----------- | -------------------------------------------- |
-| `<cr>`      | Open file or enter directory (resets filter) |
-| `<bs>`      | Go back                                      |
-| `a`         | Add file or directory (resets filter)        |
-| `m`         | Move                                         |
-| `c`         | Copy                                         |
-| `d`         | Delete                                       |
-| `f`         | Filter                                       |
-| `R`         | Refresh (resets filter)                      |
-| `q / <esc>` | Close                                        |
+| Key           | Action                                       |
+| ------------- | -------------------------------------------- |
+| `<cr>`        | Open file or enter directory (resets filter) |
+| `<bs>`        | Go back                                      |
+| `a`           | Add file or directory (resets filter)        |
+| `m`           | Move                                         |
+| `c`           | Copy                                         |
+| `d`           | Delete                                       |
+| `f`           | Filter                                       |
+| `R`           | Refresh (resets filter)                      |
+| `q` / `<esc>` | Close                                        |
