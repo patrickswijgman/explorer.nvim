@@ -341,14 +341,14 @@ local function toggle()
 
   if not buf or not vim.api.nvim_buf_is_valid(buf) or not vim.api.nvim_buf_is_loaded(buf) then
     cwd = vim.fn.getcwd()
-    load_files()
     create_buf()
-    update_buf()
     set_buf_keymaps()
   end
 
   prev_win = vim.api.nvim_get_current_win()
   create_win()
+  load_files()
+  update_buf()
   restore_cursor()
 end
 
