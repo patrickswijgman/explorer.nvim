@@ -85,6 +85,7 @@ local function decorate()
         vim.api.nvim_buf_set_extmark(buf, ns, i - 1, 0, {
           end_col = #line:match("^%[%d+%]"),
           conceal = "",
+          hl_group = "Comment",
         })
       end
     end
