@@ -30,13 +30,13 @@ leave the id itself alone. New lines you add have no id and become new files.
 
 Make your changes in the buffer, then `:w` to apply them:
 
-| Edit                                 | Result                              |
-| ------------------------------------ | ----------------------------------- |
-| Change a line's path                 | Move / rename the file              |
-| Add a new line with a path           | Create a file                       |
-| Add a new line ending in `/`         | Create a directory                  |
-| Duplicate a line and change its path | Copy the file                       |
-| Delete a line                        | Delete the file                     |
+| Edit                                 | Result                 |
+| ------------------------------------ | ---------------------- |
+| Add a new line with a path           | Create a file          |
+| Add a new line ending in `/`         | Create a directory     |
+| Change a line's path                 | Move / rename the file |
+| Duplicate a line and change its path | Copy the file          |
+| Delete a line                        | Delete the file        |
 
 On `:w` you get a summary of the planned operations and a confirmation prompt
 before anything touches disk.
