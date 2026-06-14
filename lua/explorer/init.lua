@@ -1,12 +1,11 @@
-local history = {}
-local cursors = {}
-local buf, win, prev_win, files, cwd, query
-local ns = vim.api.nvim_create_namespace("explorer_icons")
+local buf, win, prev_win, cursor
+local entries = {}
+local ns = vim.api.nvim_create_namespace("explorer")
 
 local function cmd(command, stdin)
   local result = vim.system(command, { text = true, stdin = stdin }):wait()
 
-  if result.code ~= 0 and result.code ~= 1 then
+  if result.code ~= 0 then
     vim.notify(("Command failed with error:\n%s"):format(result.stderr), vim.log.levels.ERROR)
     return ""
   end
@@ -31,83 +30,219 @@ local function sort_lines(lines)
   end)
 end
 
-local function clamp(value, min, max)
-  return math.min(max, math.max(min, value))
+local function parse_line(line)
+  local id, path = line:match("^%[(%d+)%] (.*)$")
+
+  if id then
+    return tonumber(id), vim.trim(path)
+  else
+    return nil, vim.trim(line)
+  end
+end
+
+local function get_path_start(line)
+  local prefix = line:match("^%[%d+%] ")
+  return prefix and #prefix or 0
 end
 
 local function get_parent_dir(path)
   return vim.fn.fnamemodify(path, ":h")
 end
 
-local function get_absolute_path(path)
-  if vim.startswith(path, cwd) then
-    return path
+local function is_directory(path, is_on_disk)
+  if is_on_disk then
+    return vim.fn.isdirectory(path) == 1
+  else
+    return vim.endswith(path, "/")
   end
-
-  return ("%s/%s"):format(cwd, path)
 end
 
 local function load_files()
-  local fd = cmd({ "fd", "--base-directory", cwd, "--hidden", "--no-ignore", "--exclude", ".git", "--exclude", "node_modules" })
-  local fd_lines = split_lines(fd)
-  sort_lines(fd_lines)
-
-  if query and query ~= "" then
-    local fzf = cmd({ "fzf", "--scheme", "path", "--tiebreak", "pathname", "--filter", query }, fd_lines)
-    local fzf_lines = split_lines(fzf)
-    files = fzf_lines
-  else
-    files = fd_lines
-  end
+  local output = cmd({ "fd", "--hidden", "--no-ignore", "--exclude", ".git", "--exclude", "node_modules" })
+  local files = split_lines(output)
+  sort_lines(files)
+  return files
 end
 
-local function create_buf()
-  buf = vim.api.nvim_create_buf(false, true)
-  vim.bo[buf].buftype = "nofile"
-end
-
-local function update_buf()
-  vim.bo[buf].modifiable = true
-  vim.api.nvim_buf_set_lines(buf, 0, -1, false, files)
-  vim.bo[buf].modifiable = false
+local function decorate()
+  local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
 
   vim.api.nvim_buf_clear_namespace(buf, ns, 0, -1)
 
-  for i, file in ipairs(files) do
-    local is_dir = vim.endswith(file, "/")
-    local icon = is_dir and "󰉋" or "󰈤"
-    local hl = is_dir and "Directory" or "Normal"
+  for i, line in ipairs(lines) do
+    if line ~= "" then
+      local id, path = parse_line(line)
+      local is_dir = is_directory(path)
+      local icon = is_dir and "󰉋 " or "󰈤 "
+      local hl = is_dir and "Directory" or "NormalFloat"
 
-    vim.api.nvim_buf_set_extmark(buf, ns, i - 1, 0, {
-      virt_text = { { (" %s "):format(icon), hl } },
-      virt_text_pos = "inline",
-    })
+      vim.api.nvim_buf_set_extmark(buf, ns, i - 1, get_path_start(line), {
+        virt_text = { { icon, hl } },
+        virt_text_pos = "inline",
+      })
+
+      if id then
+        vim.api.nvim_buf_set_extmark(buf, ns, i - 1, 0, {
+          end_col = #line:match("^%[%d+%]"),
+          hl_group = "Comment",
+        })
+      end
+    end
+  end
+end
+
+local function render()
+  local files = load_files()
+  local lines = {}
+  local line_format = ("[%%0%dd] %%s"):format(#tostring(#files))
+
+  entries = {}
+
+  for i, file in ipairs(files) do
+    entries[i] = file
+    lines[i] = line_format:format(i, file)
+  end
+
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+  vim.bo[buf].modified = false
+
+  decorate()
+end
+
+local function get_operations()
+  local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+  local operations = { create = {}, copy = {}, move = {}, delete = {} }
+  local paths_per_id = {}
+
+  for _, line in ipairs(lines) do
+    local id, path = parse_line(line)
+
+    if path ~= "" then
+      if id == nil then
+        table.insert(operations.create, { dst = path })
+      else
+        paths_per_id[id] = paths_per_id[id] or {}
+        table.insert(paths_per_id[id], path)
+      end
+    end
+  end
+
+  for id, paths in pairs(paths_per_id) do
+    local src = entries[id]
+    local is_kept = vim.tbl_contains(paths, src)
+    local is_moved = false
+
+    for _, dst in ipairs(paths) do
+      if dst ~= src then
+        if is_kept or is_moved then
+          table.insert(operations.copy, { src = src, dst = dst })
+        else
+          table.insert(operations.move, { src = src, dst = dst })
+          is_moved = true
+        end
+      end
+    end
+  end
+
+  for id, src in pairs(entries) do
+    if not paths_per_id[id] then
+      table.insert(operations.delete, { src = src })
+    end
+  end
+
+  return operations
+end
+
+local function apply_operations(operations)
+  for _, o in ipairs(operations.delete) do
+    cmd({ "rm", "-rf", o.src })
+  end
+
+  for _, o in ipairs(operations.copy) do
+    cmd({ "mkdir", "-p", get_parent_dir(o.dst) })
+    cmd({ "cp", "-rn", o.src, o.dst })
+  end
+
+  for _, o in ipairs(operations.move) do
+    cmd({ "mkdir", "-p", get_parent_dir(o.dst) })
+    cmd({ "mv", "-n", o.src, o.dst })
+  end
+
+  for _, o in ipairs(operations.create) do
+    if is_directory(o.dst) then
+      cmd({ "mkdir", "-p", o.dst })
+    else
+      cmd({ "mkdir", "-p", get_parent_dir(o.dst) })
+      cmd({ "touch", o.dst })
+    end
+  end
+end
+
+local function get_summary(operations)
+  local summary = {}
+
+  for _, o in ipairs(operations.create) do
+    table.insert(summary, ("%-7s %s"):format("Create", o.dst))
+  end
+
+  for _, o in ipairs(operations.move) do
+    table.insert(summary, ("%-7s %s → %s"):format("Move", o.src, o.dst))
+  end
+
+  for _, o in ipairs(operations.copy) do
+    table.insert(summary, ("%-7s %s → %s"):format("Copy", o.src, o.dst))
+  end
+
+  for _, o in ipairs(operations.delete) do
+    table.insert(summary, ("%-7s %s"):format("Delete", o.src))
+  end
+
+  return summary
+end
+
+local function apply()
+  local operations = get_operations()
+  local summary = get_summary(operations)
+
+  if #summary == 0 then
+    return
+  end
+
+  local message = ("Apply the following %d change(s)?\n\n%s\n"):format(#summary, table.concat(summary, "\n"))
+
+  if vim.fn.confirm(message, "&Yes\n&No", 2) == 1 then
+    apply_operations(operations)
+    render()
   end
 end
 
 local function save_cursor()
   if win and vim.api.nvim_win_is_valid(win) then
-    cursors[cwd] = vim.api.nvim_win_get_cursor(win)
+    cursor = vim.api.nvim_win_get_cursor(win)
   end
 end
 
 local function restore_cursor()
-  if #files == 0 then
-    return
-  end
-
-  local cursor = cursors[cwd] or { 1, 0 }
-  local row = clamp(cursor[1], 1, #files)
-  local col = cursor[2]
-
   if win and vim.api.nvim_win_is_valid(win) then
-    vim.api.nvim_win_set_cursor(win, { row, col })
+    if cursor then
+      vim.api.nvim_win_set_cursor(win, cursor)
+    else
+      local line = vim.api.nvim_buf_get_lines(buf, 0, 1, false)[1] or ""
+      local row = 1
+      local col = get_path_start(line)
+      vim.api.nvim_win_set_cursor(win, { row, col })
+    end
   end
 end
 
-local function reset_cursor()
-  if win and vim.api.nvim_win_is_valid(win) then
-    vim.api.nvim_win_set_cursor(win, { 1, 0 })
+local function clamp_cursor()
+  local pos = vim.api.nvim_win_get_cursor(0)
+  local row = pos[1]
+  local col = pos[2]
+  local min_col = get_path_start(vim.api.nvim_get_current_line())
+
+  if col < min_col then
+    vim.api.nvim_win_set_cursor(0, { row, min_col })
   end
 end
 
@@ -116,35 +251,23 @@ local function get_win_config()
   local height = math.floor(vim.o.lines * 0.8)
   local row = math.floor((vim.o.lines - height) / 2)
   local col = math.floor((vim.o.columns - width) / 2)
-  local title = (query and query ~= "") and (" %s [%s] "):format(cwd, query) or (" %s "):format(cwd)
+  local title = (" %s "):format(vim.fn.getcwd())
 
   return {
+    title = title,
+    title_pos = "center",
+    relative = "editor",
+    style = "minimal",
+    border = "rounded",
     width = width,
     height = height,
     row = row,
     col = col,
-    relative = "editor",
-    style = "minimal",
-    border = "rounded",
-    title = title,
-    title_pos = "center",
     footer = {
       { " <cr>", "Special" },
       { " open  ", "Comment" },
-      { "<bs>", "Special" },
-      { " back  ", "Comment" },
-      { "a", "Special" },
-      { " add  ", "Comment" },
-      { "m", "Special" },
-      { " move  ", "Comment" },
-      { "c", "Special" },
-      { " copy  ", "Comment" },
-      { "d", "Special" },
-      { " delete  ", "Comment" },
-      { "f", "Special" },
-      { " filter  ", "Comment" },
-      { "R", "Special" },
-      { " refresh  ", "Comment" },
+      { ":w", "Special" },
+      { " apply  ", "Comment" },
       { "q", "Special" },
       { " close ", "Comment" },
     },
@@ -155,7 +278,7 @@ end
 local function create_win()
   win = vim.api.nvim_open_win(buf, true, get_win_config())
   vim.wo[win].cursorline = true
-  vim.fn.matchadd("Directory", ".*/", -1, -1, { window = win })
+  vim.fn.matchadd("Directory", [[^\(\[\d\+\] \)\?\zs.*/]], -1, -1, { window = win })
 end
 
 local function update_win()
@@ -165,6 +288,16 @@ local function update_win()
 end
 
 local function close_win()
+  if buf and vim.bo[buf].modified then
+    local result = vim.fn.confirm("Discard unsaved changes?", "&Yes\n&No", 2)
+
+    if result ~= 1 then
+      return
+    end
+
+    vim.bo[buf].modified = false
+  end
+
   save_cursor()
 
   if win and vim.api.nvim_win_is_valid(win) then
@@ -177,160 +310,52 @@ local function close_win()
   end
 end
 
-local function navigate(dir)
-  save_cursor()
-  cwd = dir:gsub("/$", "")
-  query = nil
-  load_files()
-  update_buf()
-  update_win()
-  restore_cursor()
+local function create_buf()
+  buf = vim.api.nvim_create_buf(false, false)
+  vim.api.nvim_buf_set_name(buf, ("explorer://%s"):format(vim.fn.getcwd()))
+  vim.bo[buf].buftype = "acwrite"
+  vim.bo[buf].bufhidden = "wipe"
+  vim.bo[buf].swapfile = false
+
+  vim.api.nvim_create_autocmd("BufWriteCmd", {
+    buffer = buf,
+    callback = apply,
+    desc = "Apply explorer edits to the filesystem",
+  })
+
+  vim.api.nvim_create_autocmd({ "TextChanged", "TextChangedI", "TextChangedP" }, {
+    buffer = buf,
+    callback = decorate,
+    desc = "Refresh explorer decorations after an edit",
+  })
+
+  vim.api.nvim_create_autocmd("CursorMoved", {
+    buffer = buf,
+    callback = clamp_cursor,
+    desc = "Keep the cursor out of the id prefix",
+  })
 end
 
-local function enter()
-  local line = vim.api.nvim_get_current_line()
-  if line == "" then
+local function open()
+  local _, path = parse_line(vim.api.nvim_get_current_line())
+
+  if path == "" or is_directory(path) then
     return
   end
 
-  local path = get_absolute_path(line)
-
-  if vim.endswith(path, "/") then
-    table.insert(history, cwd)
-    navigate(path)
-  else
-    close_win()
-    vim.cmd.edit(path)
-  end
-end
-
-local function back()
-  if #history > 0 then
-    navigate(table.remove(history))
-  end
-end
-
-local function filter()
-  local input = vim.fn.input("Filter: ", query or "")
-  query = (input ~= "") and input or nil
-  load_files()
-  update_buf()
-  update_win()
-  reset_cursor()
-end
-
-local function refresh()
-  query = nil
-  load_files()
-  update_buf()
-  update_win()
-end
-
-local function jump_to(path)
-  for i, file in ipairs(files) do
-    local file_path = get_absolute_path(file)
-
-    if file_path == path then
-      if win and vim.api.nvim_win_is_valid(win) then
-        vim.api.nvim_win_set_cursor(win, { i, 0 })
-      end
-
-      return
-    end
-  end
-end
-
-local function add()
-  local line = vim.api.nvim_get_current_line()
-  local path = get_absolute_path(line)
-
-  local dir
-  if vim.endswith(path, "/") then
-    dir = path
-  else
-    dir = ("%s/"):format(get_parent_dir(path))
-  end
-
-  local input = vim.fn.input({ prompt = "New: ", default = dir, completion = "file" })
-  if input == "" then
+  if vim.bo[buf].modified then
+    vim.notify("Save (:w) or undo your edits first", vim.log.levels.WARN)
     return
   end
 
-  if vim.endswith(input, "/") then
-    cmd({ "mkdir", "-p", input })
-  else
-    cmd({ "mkdir", "-p", get_parent_dir(input) })
-    cmd({ "touch", input })
-  end
-
-  query = nil
-  load_files()
-  update_buf()
-  update_win()
-  jump_to(input)
-end
-
-local function move()
-  local line = vim.api.nvim_get_current_line()
-  local src = get_absolute_path(line)
-
-  local dst = vim.fn.input({ prompt = "Move to: ", default = src, completion = "file" })
-  if dst == "" or dst == src then
-    return
-  end
-
-  cmd({ "mkdir", "-p", get_parent_dir(dst) })
-  cmd({ "mv", src, dst })
-
-  load_files()
-  update_buf()
-  jump_to(dst)
-end
-
-local function copy()
-  local line = vim.api.nvim_get_current_line()
-  local src = get_absolute_path(line)
-
-  local dst = vim.fn.input({ prompt = "Copy to: ", default = src, completion = "file" })
-  if dst == "" or dst == src then
-    return
-  end
-
-  cmd({ "mkdir", "-p", get_parent_dir(dst) })
-  cmd({ "cp", "-r", src, dst })
-
-  load_files()
-  update_buf()
-  jump_to(dst)
-end
-
-local function delete()
-  local line = vim.api.nvim_get_current_line()
-  local path = get_absolute_path(line)
-
-  local result = vim.fn.confirm(("Delete %s ?"):format(path), "&Yes\n&No", 2)
-  if result ~= 1 then
-    return
-  end
-
-  cmd({ "rm", "-rf", path })
-
-  load_files()
-  update_buf()
+  close_win()
+  vim.cmd.edit(path)
 end
 
 local function set_buf_keymaps()
   local keymap_opts = { buffer = buf, nowait = true }
-  vim.keymap.set("n", "<cr>", enter, keymap_opts)
-  vim.keymap.set("n", "<bs>", back, keymap_opts)
-  vim.keymap.set("n", "a", add, keymap_opts)
-  vim.keymap.set("n", "m", move, keymap_opts)
-  vim.keymap.set("n", "c", copy, keymap_opts)
-  vim.keymap.set("n", "d", delete, keymap_opts)
-  vim.keymap.set("n", "f", filter, keymap_opts)
-  vim.keymap.set("n", "R", refresh, keymap_opts)
+  vim.keymap.set("n", "<cr>", open, keymap_opts)
   vim.keymap.set("n", "q", close_win, keymap_opts)
-  vim.keymap.set("n", "<esc>", close_win, keymap_opts)
 end
 
 local function toggle()
@@ -339,23 +364,19 @@ local function toggle()
     return
   end
 
-  if not buf or not vim.api.nvim_buf_is_valid(buf) or not vim.api.nvim_buf_is_loaded(buf) then
-    cwd = vim.fn.getcwd()
-    create_buf()
-    set_buf_keymaps()
-  end
+  create_buf()
+  set_buf_keymaps()
 
   prev_win = vim.api.nvim_get_current_win()
   create_win()
-  load_files()
-  update_buf()
+  render()
   restore_cursor()
 end
 
 local function open_on_enter()
-  local arg = vim.fn.argv(0) --[[@as string]]
+  local arg = vim.fn.argv(0)
 
-  if arg ~= "" and vim.fn.isdirectory(arg) == 1 then
+  if arg ~= "" and is_directory(arg, true) then
     vim.cmd.cd(arg)
     toggle()
   end
