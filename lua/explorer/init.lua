@@ -75,15 +75,16 @@ local function decorate()
       local is_dir = is_directory(path)
       local icon = is_dir and " 󰉋 " or " 󰈤 "
       local hl = is_dir and "Directory" or "NormalFloat"
+      local col = get_path_start(line)
 
-      vim.api.nvim_buf_set_extmark(buf, ns, i - 1, get_path_start(line), {
+      vim.api.nvim_buf_set_extmark(buf, ns, i - 1, col, {
         virt_text = { { icon, hl } },
         virt_text_pos = "inline",
       })
 
       if id then
         vim.api.nvim_buf_set_extmark(buf, ns, i - 1, 0, {
-          end_col = #line:match("^%[%d+%]"),
+          end_col = col,
           conceal = "",
           hl_group = "Comment",
         })
@@ -154,6 +155,19 @@ local function get_operations()
   return operations
 end
 
+local function has_operations(operations)
+  return #operations.create > 0 or #operations.copy > 0 or #operations.move > 0 or #operations.delete > 0
+end
+
+local function update_modified()
+  vim.bo[buf].modified = has_operations(get_operations())
+end
+
+local function on_edit()
+  decorate()
+  update_modified()
+end
+
 local function apply_operations(operations)
   for _, o in ipairs(operations.delete) do
     cmd({ "rm", "-rf", o.src })
@@ -203,12 +217,12 @@ end
 
 local function apply()
   local operations = get_operations()
-  local summary = get_summary(operations)
 
-  if #summary == 0 then
+  if not has_operations(operations) then
     return
   end
 
+  local summary = get_summary(operations)
   local message = ("Apply the following %d change(s)?\n\n%s\n"):format(#summary, table.concat(summary, "\n"))
 
   if vim.fn.confirm(message, "&Yes\n&No", 2) == 1 then
@@ -291,14 +305,12 @@ local function update_win()
 end
 
 local function close_win()
-  if buf and vim.bo[buf].modified then
+  if buf and vim.api.nvim_buf_is_valid(buf) and has_operations(get_operations()) then
     local result = vim.fn.confirm("Discard unsaved changes?", "&Yes\n&No", 2)
 
     if result ~= 1 then
       return
     end
-
-    vim.bo[buf].modified = false
   end
 
   save_cursor()
@@ -328,8 +340,8 @@ local function create_buf()
 
   vim.api.nvim_create_autocmd({ "TextChanged", "TextChangedI", "TextChangedP" }, {
     buffer = buf,
-    callback = decorate,
-    desc = "Refresh explorer decorations after an edit",
+    callback = on_edit,
+    desc = "Refresh explorer decorations and modified state after an edit",
   })
 
   vim.api.nvim_create_autocmd("CursorMoved", {
@@ -346,7 +358,7 @@ local function open()
     return
   end
 
-  if vim.bo[buf].modified then
+  if has_operations(get_operations()) then
     vim.notify("Save (:w) or undo your edits first", vim.log.levels.WARN)
     return
   end
