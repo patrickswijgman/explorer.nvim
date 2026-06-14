@@ -31,7 +31,7 @@ local function sort_lines(lines)
 end
 
 local function parse_line(line)
-  local id, path = line:match("^%[(%d+)%] (.*)$")
+  local id, path = line:match("^%[(%d+)%](.*)$")
 
   if id then
     return tonumber(id), vim.trim(path)
@@ -41,7 +41,7 @@ local function parse_line(line)
 end
 
 local function get_path_start(line)
-  local prefix = line:match("^%[%d+%] ")
+  local prefix = line:match("^%[%d+%]")
   return prefix and #prefix or 0
 end
 
@@ -83,7 +83,7 @@ local function decorate()
 
       if id then
         vim.api.nvim_buf_set_extmark(buf, ns, i - 1, 0, {
-          end_col = #line:match("^%[%d+%] "),
+          end_col = #line:match("^%[%d+%]"),
           conceal = "",
         })
       end
@@ -94,7 +94,7 @@ end
 local function render()
   local files = load_files()
   local lines = {}
-  local line_format = ("[%%0%dd] %%s"):format(#tostring(#files))
+  local line_format = ("[%%0%dd]%%s"):format(#tostring(#files))
 
   entries = {}
 
@@ -280,7 +280,7 @@ local function create_win()
   vim.wo[win].cursorline = true
   vim.wo[win].conceallevel = 3
   vim.wo[win].concealcursor = "nc"
-  vim.fn.matchadd("Directory", [[^\(\[\d\+\] \)\?\zs.*/]], -1, -1, { window = win })
+  vim.fn.matchadd("Directory", [[^\(\[\d\+\]\)\?\zs.*/]], -1, -1, { window = win })
 end
 
 local function update_win()
