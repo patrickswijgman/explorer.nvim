@@ -96,13 +96,12 @@ end
 local function render()
   local files = load_files()
   local lines = {}
-  local line_format = ("[%%0%dd]%%s"):format(#tostring(#files))
 
   entries = {}
 
   for i, file in ipairs(files) do
     entries[i] = file
-    lines[i] = line_format:format(i, file)
+    lines[i] = ("[%d]%s"):format(i, file)
   end
 
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
