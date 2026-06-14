@@ -73,7 +73,7 @@ local function decorate()
     if line ~= "" then
       local id, path = parse_line(line)
       local is_dir = is_directory(path)
-      local icon = is_dir and "󰉋 " or "󰈤 "
+      local icon = is_dir and " 󰉋 " or " 󰈤 "
       local hl = is_dir and "Directory" or "NormalFloat"
 
       vim.api.nvim_buf_set_extmark(buf, ns, i - 1, get_path_start(line), {
@@ -83,8 +83,8 @@ local function decorate()
 
       if id then
         vim.api.nvim_buf_set_extmark(buf, ns, i - 1, 0, {
-          end_col = #line:match("^%[%d+%]"),
-          hl_group = "Comment",
+          end_col = #line:match("^%[%d+%] "),
+          conceal = "",
         })
       end
     end
@@ -278,6 +278,8 @@ end
 local function create_win()
   win = vim.api.nvim_open_win(buf, true, get_win_config())
   vim.wo[win].cursorline = true
+  vim.wo[win].conceallevel = 3
+  vim.wo[win].concealcursor = "nc"
   vim.fn.matchadd("Directory", [[^\(\[\d\+\] \)\?\zs.*/]], -1, -1, { window = win })
 end
 
